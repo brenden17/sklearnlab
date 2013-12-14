@@ -61,7 +61,7 @@ def lda(X, y, components=10):
     lda = LDA(n_components=components)
     return lda.fit_transform(X, y)
 
-@timer('')
+@timer('check time')
 def analysis_lda_train():
     X, y = get_xy()
     # clf = LogisticRegression()
