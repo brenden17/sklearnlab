@@ -3,7 +3,11 @@ import os
 import sys
 import logging
 import numpy as np
+import pandas as pd
 from matplotlib import pylab
+from sklearn.externals import joblib
+from sklearn.grid_search import IterGrid
+from sklearn.cross_validation import KFold
 from sklearn.metrics import confusion_matrix
 from sklearnlab.util.base import StemmedCountVectorizer,\
                                  StemmedTfidfVectorizer
@@ -11,7 +15,7 @@ from sklearnlab.util.base import StemmedCountVectorizer,\
 __all__ = ['StemmedCountVectorizer', 'StemmedTfidfVectorizer',
            'Logger', 'get_projectpath', 'convert2d', 'plot_score',
            'plot_precision_recall', 'plot_confusion_matrix', 'plot_roc',
-           'timer'
+           'timer', 'check_na'
             ]
 
 import time
@@ -61,7 +65,16 @@ class Logger(object):
     def flush(self):
         for handler in self.logger.handlers:
             handler.close()
-    
+
+def check_na(df, name='Original'):
+    if name:
+        print('==== %s =====' % name)
+        print(df.shape)
+    for k in  df.keys():
+        nansize = pd.isnull(df[k]).sum()
+        if nansize:
+            print('%s - %d' % (k, nansize))
+ 
 def get_projectpath():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     
@@ -141,10 +154,41 @@ def plot_roc(auc_score, tpr, fpr, label=None):
     pylab.legend(loc="lower right")
     pylab.show()
 
+def persist_cv_file(X, y, cv):
+    dataname = 'data'
+    suffix = '_cv_%03d.pkl'
+    cv_split_filenames = []
+    for i, (train, test) in enumerate(cv):
+        cv_fold = ([X[k] for k in train], y[train], [X[k] for k in test], y[test])
+        cv_split_filename = dataname + suffix % i
+        cv_split_filename = os.path.abspath(cv_split_filename)
+        joblib.dump(cv_fold, cv_split_filename)
+        cv_split_filenames.append(cv_split_filename)
+        return cv_split_filenames
+
+
+def evaluate_cv_file(cv_split_filename, clf, params):
+    X_train, y_train, X_test, y_test = joblib.load(
+        cv_split_filename, mmap_mode='c')
+    
+    clf.set_params(**params)
+    clf.fit(X_train, y_train)
+    test_score = clf.score(X_test, y_test)
+    return test_score
+
+def parallel_grid_search(lb_view, clf, cv_split_filenames, param_grid):
+    all_tasks = []
+    all_parameters = list(IterGrid(param_grid))
+    for i, params in enumerate(all_parameters):
+        task_for_params = []
+        for j, cv_split_filename in enumerate(cv_split_filenames):    
+            t = lb_view.apply(evaluate_cv_file,
+                              cv_split_filename, clf, params)
+            task_for_params.append(t) 
+        all_tasks.append(task_for_params)
+        
+    return all_parameters, all_tasks
+
 
 if __name__ == '__main__':
-    true_y = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3])
-    predicted_y = np.array([1, 2, 1, 2, 2, 3, 3, 2, 3])
-    cm = confusion_matrix(true_y, predicted_y)
-    for i in range(3):
-        print(convert2d(cm, i))    
+    pass

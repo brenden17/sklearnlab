@@ -3,8 +3,9 @@ import numpy as np
 import nltk
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils import check_arrays
+from sklearn.utils import persist_cv_file
 from sklearn import datasets
+from sklearn.cross_validation import KFold
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
@@ -59,6 +60,7 @@ def test_grid_search(clf, X, y):
     print gs.best_estimator_.get_params()
     
 if __name__ == '__main__':
+    """
     vectorizer = StemmedCountVectorizer(min_df=1, stop_words='english')
     l = ['I go to home', 'I went to the school', 'Let me go']
     print vectorizer.fit_transform(l)
@@ -96,3 +98,10 @@ if __name__ == '__main__':
     gs = GridSearchCV(clf, parameters)
     gs.fit(X, y)
     print gs.best_estimator_.get_params()
+    """
+    
+    from sklearn.datasets import load_iris
+    iris = load_iris()
+    X, y = iris.data, iris.target
+    cv = KFold(X.shape[0], 2, shuffle=True, random_state=0)
+    persist_cv_file(X, y, cv)   
